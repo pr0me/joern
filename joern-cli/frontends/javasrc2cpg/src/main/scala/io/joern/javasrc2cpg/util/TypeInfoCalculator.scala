@@ -226,6 +226,7 @@ object TypeInfoCalculator {
     val Boolean: String = "boolean"
     val Object: String  = "java.lang.Object"
     val Class: String   = "java.lang.Class"
+    val Void: String    = "void"
   }
 
   object TypeNameConstants {
