@@ -930,10 +930,6 @@ class AstCreator(filename: String, javaParserAst: CompilationUnit, global: Globa
         // This duplicates some code from TypeInfoCalculator.nameOrFullName, but provides a way to calculate
         // the expected return type above, re-use that here and avoid attempting to resolve unresolvable
         // types twice.
-        .orElse(methodDeclaration.getType match {
-          case primitiveType: PrimitiveType => Some(primitiveType.toString)
-          case _                            => None
-        })
         .orElse(scopeStack.lookupVariableType(methodDeclaration.getTypeAsString))
         .orElse(scopeStack.getWildcardType(methodDeclaration.getTypeAsString))
 
