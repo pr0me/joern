@@ -2,9 +2,10 @@ package io.joern.javasrc2cpg.querying
 
 import io.joern.javasrc2cpg.testfixtures.JavaSrcCode2CpgFixture
 import io.shiftleft.codepropertygraph.generated.edges.{Binds, Capture, Ref}
-import io.shiftleft.codepropertygraph.generated.Operators
+import io.shiftleft.codepropertygraph.generated.{DispatchTypes, Operators}
 import io.shiftleft.codepropertygraph.generated.nodes.{
   Binding,
+  Block,
   Call,
   ClosureBinding,
   Identifier,
@@ -278,7 +279,7 @@ class LambdaTests extends JavaSrcCode2CpgFixture {
         |""".stripMargin)
 
     // TODO: Add 0th parameter logic
-    "create a 0th `this` parameter" ignore {
+    "create a 0th `this` parameter" in {
       cpg.method.name(".*lambda.*").parameter.l match {
         case List(thisParam, inputParam) =>
           thisParam.name shouldBe "this"
@@ -313,7 +314,7 @@ class LambdaTests extends JavaSrcCode2CpgFixture {
         |""".stripMargin)
 
     // TODO: Add 0th parameter logic
-    "create a 0th `this` parameter" ignore {
+    "create a 0th `this` parameter" in {
       cpg.method.name(".*lambda.*").parameter.l match {
         case List(thisParam, inputParam) =>
           thisParam.name shouldBe "this"
@@ -490,6 +491,40 @@ class LambdaTests extends JavaSrcCode2CpgFixture {
       }
     }
 
+    "create the method body for the lambda" in {
+      cpg.typeDecl.name("TestClass").method.name(".*lambda.*").body.astChildren.l match {
+        case List(capturedLocal: Local, ret: Return) =>
+          capturedLocal.name shouldBe "captured"
+          capturedLocal.typeFullName shouldBe "java.lang.String"
+
+          ret.order shouldBe 2
+          ret.astChildren.size shouldBe 1
+          ret.astChildren.collectAll[Call].size shouldBe 1
+          val fooCall = ret.astChildren.collectAll[Call].head
+          fooCall.name shouldBe "foo"
+          fooCall.methodFullName shouldBe "TestClass.foo:java.lang.String(java.lang.Integer,java.lang.Float,java.lang.String)"
+          fooCall.typeFullName shouldBe "java.lang.String"
+          fooCall.signature shouldBe "java.lang.String(java.lang.Integer,java.lang.Float,java.lang.String)"
+          fooCall.dispatchType shouldBe DispatchTypes.STATIC_DISPATCH
+
+          fooCall.argument.l match {
+            case List(input: Identifier, moreInput: Identifier, captured: Identifier) =>
+              input.name shouldBe "input"
+              input.typeFullName shouldBe "java.lang.Integer"
+
+              moreInput.name shouldBe "moreInput"
+              moreInput.typeFullName shouldBe "java.lang.Float"
+
+              captured.name shouldBe "captured"
+              captured.typeFullName shouldBe "java.lang.String"
+
+            case result => fail(s"Expected three identifier arguments to foo but got $result")
+          }
+
+        case result => fail(s"Expected single captured local and return in method body but got $result")
+      }
+    }
+
     "create the correct binding for the lambda method" in {
       cpg.all.collectAll[Binding].filter(_.name == "lambda$0").l match {
         case List(lambdaBinding) =>
@@ -544,14 +579,14 @@ class LambdaTests extends JavaSrcCode2CpgFixture {
     }
 
     // TODO: Fix typeDecl for interfaceBinding
-    "create bindings to implemented method" ignore {
+    "create bindings to implemented method" in {
       cpg.all.collectAll[Binding].nameExact("baz").sortBy(_.methodFullName).toList match {
         case List(interfaceBinding, erasedBinding, binding) =>
           interfaceBinding.methodFullName shouldBe "Foo.baz:java.lang.String(java.lang.Object,java.lang.Object)"
           interfaceBinding.signature shouldBe "java.lang.String(java.lang.Object,java.lang.Object)"
           binding.inE.collectAll[Binds].map(_.outNode()).l match {
             case List(typeDecl: TypeDecl) => typeDecl.fullName shouldBe "Foo"
-            case result         => fail(s"Expected typeDecl but got $result")
+            case result                   => fail(s"Expected typeDecl but got $result")
           }
 
           binding.methodFullName shouldBe "TestClass.lambda$0:java.lang.String(java.lang.Integer,java.lang.Float)"
@@ -578,7 +613,7 @@ class LambdaTests extends JavaSrcCode2CpgFixture {
   // This is an example of a case where all the type info we need to figure out that the lambda implements
   // `Function<String, String>`, but from JavaParser and the current expectedType propagation we only get
   // `java.util.Function<Object, Object>`
-  "a lambda implementing a mapper in stream" ignore {
+  "a lambda implementing a mapper in stream" should {
     val cpg = code("""
         |import java.util.List;
         |import java.util.stream.Collectors;

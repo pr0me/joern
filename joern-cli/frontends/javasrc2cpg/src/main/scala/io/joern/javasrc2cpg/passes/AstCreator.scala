@@ -2537,14 +2537,25 @@ class AstCreator(filename: String, javaParserAst: CompilationUnit, global: Globa
     // We need to get this information from the expected type as the JavaParser
     // symbol solver returns the erased types when resolving the lambda itself.
     val expectedTypeParamTypes = genericParamTypeMapForLambda(expectedLambdaType)
-    val parameters             = buildParamListForLambda(expr, implementedMethod, expectedTypeParamTypes)
+    val parametersWithoutThis  = buildParamListForLambda(expr, implementedMethod, expectedTypeParamTypes)
 
     val returnType = getLambdaReturnType(implementedInterface, implementedMethod, expectedTypeParamTypes)
 
+    val lambdaMethodBody = astForLambdaBody(expr.getBody, localsForCaptured, returnType, parametersWithoutThis.size + 1)
+
+    val thisParam = lambdaMethodBody.nodes
+      .collect { case identifier: NewIdentifier => identifier }
+      .find { identifier => identifier.name == "this" || identifier.name == "super" }
+      .map { _ =>
+        val typeFullName = scopeStack.getEnclosingTypeDecl.map(_.fullName).getOrElse(UnresolvedTypeDefault)
+        thisAstForMethod(typeFullName, line(expr))
+      }
+      .toList
+
+    val parameters = thisParam ++ parametersWithoutThis
+
     val lambdaMethodNode = createLambdaMethodNode(expr, parameters, returnType)
     addLambdaMethodBindingToDiffGraph(lambdaMethodNode)
-
-    val lambdaMethodBody = astForLambdaBody(expr.getBody, localsForCaptured, returnType, parameters.size + 1)
 
     val methodReturnNode =
       NewMethodReturn()
