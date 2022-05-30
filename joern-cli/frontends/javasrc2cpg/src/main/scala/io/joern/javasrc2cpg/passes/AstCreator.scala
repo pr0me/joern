@@ -2066,10 +2066,7 @@ class AstCreator(filename: String, javaParserAst: CompilationUnit, global: Globa
     */
   def astForObjectCreationExpr(expr: ObjectCreationExpr, order: Int, expectedType: Option[ExpectedType]): Ast = {
     val maybeResolvedExpr = Try(expr.resolve())
-    val argumentAsts = withOrder(expr.getArguments) { (x, o) =>
-      val expectedArgType = getExpectedParamType(maybeResolvedExpr, o - 1)
-      astsForExpression(x, o, expectedArgType)
-    }.flatten
+    val argumentAsts      = argAstsForCall(expr, maybeResolvedExpr, expr.getArguments)
 
     val allocFullName = Operators.alloc
     val typeFullName = typeInfoCalc
@@ -2209,9 +2206,8 @@ class AstCreator(filename: String, javaParserAst: CompilationUnit, global: Globa
   }
 
   private def astForExplicitConstructorInvocation(stmt: ExplicitConstructorInvocationStmt, order: Int): Ast = {
-    val args = withOrder(stmt.getArguments) { (s, o) =>
-      astsForExpression(s, o, None)
-    }.flatten
+    val maybeResolved = Try(stmt.resolve())
+    val args          = argAstsForCall(stmt, maybeResolved, stmt.getArguments)
 
     val typeFullName = Try(stmt.resolve())
       .map(_.declaringType())
@@ -2666,10 +2662,18 @@ class AstCreator(filename: String, javaParserAst: CompilationUnit, global: Globa
     idx: Int
   ): Option[ExpectedType] = {
     maybeResolvedCall.toOption.map { methodDecl =>
-      // TODO Will this crash without the previously included Try?
-      val resolvedType = methodDecl.getParam(idx).getType
-      val typeName     = typeInfoCalc.fullName(resolvedType)
-      ExpectedType(typeName, Some(resolvedType))
+      val paramCount = methodDecl.getNumberOfParams
+
+      val resolvedType = if (idx < paramCount) {
+        Some(methodDecl.getParam(idx).getType)
+      } else if (paramCount > 0 && methodDecl.getParam(paramCount - 1).isVariadic) {
+        Some(methodDecl.getParam(paramCount - 1).getType)
+      } else {
+        None
+      }
+
+      val typeName = resolvedType.map(typeInfoCalc.fullName)
+      ExpectedType(typeName.getOrElse(UnresolvedTypeDefault), resolvedType)
     }
   }
 
@@ -2729,13 +2733,50 @@ class AstCreator(filename: String, javaParserAst: CompilationUnit, global: Globa
     }
   }
 
+  private def argAstsForCall(
+    call: Node,
+    tryResolvedDecl: Try[ResolvedMethodLikeDeclaration],
+    args: NodeList[Expression]
+  ): Seq[Ast] = {
+    val hasVariadicParameter = tryResolvedDecl.map(_.hasVariadicParameter).getOrElse(false)
+    val paramCount           = tryResolvedDecl.map(_.getNumberOfParams).getOrElse(-1)
+
+    val argsAsts = withOrder(args) { (arg, o) =>
+      val expectedType = getExpectedParamType(tryResolvedDecl, o - 1)
+      // Calculate order, taking into account varargs which will be children to a new arrayInitializer node.
+      val order = if (hasVariadicParameter && (o >= paramCount)) o - paramCount + 1 else o
+      astsForExpression(arg, order, expectedType)
+    }.flatten
+
+    tryResolvedDecl match {
+      case Success(_) if hasVariadicParameter =>
+        val expectedVariadicTypeFullName =
+          getExpectedParamType(tryResolvedDecl, paramCount - 1)
+            .map(_.fullName)
+            .getOrElse(UnresolvedTypeDefault)
+        val (regularArgs, varargs) = argsAsts.splitAt(paramCount - 1)
+        val arrayInitializer =
+          NewCall()
+            .name(Operators.arrayInitializer)
+            .methodFullName(Operators.arrayInitializer)
+            .code(Operators.arrayInitializer)
+            .typeFullName(expectedVariadicTypeFullName)
+            .order(paramCount)
+            .argumentIndex(paramCount)
+            .dispatchType(DispatchTypes.STATIC_DISPATCH)
+            .lineNumber(line(call))
+            .columnNumber(column(call))
+
+        val arrayInitializerAst = callAst(arrayInitializer, varargs)
+
+        regularArgs ++ Seq(arrayInitializerAst)
+
+      case _ => argsAsts
+    }
+  }
   private def astForMethodCall(call: MethodCallExpr, order: Int = 1, expectedReturnType: Option[ExpectedType]): Ast = {
     val maybeResolvedCall = Try(call.resolve())
-    val argumentAsts = withOrder(call.getArguments) { (arg, o) =>
-      // TODO: Verify index
-      val expectedType = getExpectedParamType(maybeResolvedCall, o - 1)
-      astsForExpression(arg, o, expectedType)
-    }.flatten
+    val argumentAsts      = argAstsForCall(call, maybeResolvedCall, call.getArguments)
 
     val expressionTypeFullName = expressionReturnTypeFullName(call)
       .orElse(expectedReturnType.map(_.fullName))
@@ -2822,16 +2863,18 @@ class AstCreator(filename: String, javaParserAst: CompilationUnit, global: Globa
   }
 
   private def astForParameter(parameter: Parameter, childNum: Int): Ast = {
-    val typeFullName =
+    val maybeArraySuffix = if (parameter.isVarArgs) "[]" else ""
+    val typeFullName = {
       typeInfoCalc
         .fullName(parameter.getType)
         .orElse(scopeStack.lookupVariableType(parameter.getTypeAsString))
         .orElse(scopeStack.getWildcardType(parameter.getTypeAsString))
         .getOrElse(UnresolvedTypeDefault)
+    }
     val parameterNode = NewMethodParameterIn()
       .name(parameter.getName.toString)
       .code(parameter.toString)
-      .typeFullName(typeFullName)
+      .typeFullName(s"$typeFullName$maybeArraySuffix")
       .order(childNum)
       .lineNumber(line(parameter))
       .columnNumber(column(parameter))
