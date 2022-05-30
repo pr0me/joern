@@ -62,11 +62,11 @@ class LambdaTests extends JavaSrcCode2CpgFixture {
           lambdaBinding.methodFullName shouldBe "Foo.lambda$0:java.lang.String(java.lang.String)"
           lambdaBinding.signature shouldBe "java.lang.String(java.lang.String)"
 
-          lambdaBinding.inE.collectAll[Binds].l match {
-            case List(bindsEdge) =>
-              bindsEdge.outNode().asInstanceOf[TypeDecl].fullName shouldBe "Foo"
+          lambdaBinding.inE.collectAll[Binds].map(_.outNode()).l match {
+            case List(typeDecl: TypeDecl) =>
+              typeDecl.fullName shouldBe "Foo"
 
-            case result => fail(s"Expected single BINDS in edge but got $result")
+            case result => fail(s"Expected single typeDecl but got $result")
           }
 
         case result => fail(s"Expected single binding for lambda method but got $result")
@@ -111,19 +111,17 @@ class LambdaTests extends JavaSrcCode2CpgFixture {
           val fallbackLocal = cpg.method.name(".*lambda.*").local.name("fallback").head
           fallbackClosureBinding.closureBindingId shouldBe fallbackLocal.closureBindingId
 
-          fallbackClosureBinding.outE.collectAll[Ref].l match {
-            case List(outRef) =>
-              val capturedParam = outRef.inNode.asInstanceOf[MethodParameterIn]
+          fallbackClosureBinding.outE.collectAll[Ref].map(_.inNode()).l match {
+            case List(capturedParam: MethodParameterIn) =>
               capturedParam.name shouldBe "fallback"
               capturedParam.method.head.fullName shouldBe "Foo.test1:void(java.lang.String,java.lang.String)"
-            case result => fail(s"Expected single REF outE from closureBinding to capturedParam but got $result")
+            case result => fail(s"Expected single capturedParam but got $result")
           }
 
-          fallbackClosureBinding.inE.collectAll[Capture].l match {
-            case List(capture) =>
-              val outMethod = capture.outNode().asInstanceOf[MethodRef]
+          fallbackClosureBinding.inE.collectAll[Capture].map(_.outNode()).l match {
+            case List(outMethod: MethodRef) =>
               outMethod.methodFullName shouldBe "Foo.lambda$0:java.lang.String(java.lang.String)"
-            case result => fail(s"Expected single CAPTURE inE but got $result")
+            case result => fail(s"Expected single METHOD_REF but got $result")
           }
 
         case result => fail(s"Expected 2 closure bindings for captured variables but got $result")
@@ -146,18 +144,18 @@ class LambdaTests extends JavaSrcCode2CpgFixture {
         case List(erasedBinding, binding) =>
           binding.methodFullName shouldBe "Foo.lambda$0:java.lang.String(java.lang.String)"
           binding.signature shouldBe "java.lang.String(java.lang.String)"
-          binding.inE.collectAll[Binds].map(_.outNode().asInstanceOf[TypeDecl]).l match {
-            case List(typeDecl) =>
+          binding.inE.collectAll[Binds].map(_.outNode()).l match {
+            case List(typeDecl: TypeDecl) =>
               typeDecl.fullName shouldBe "Foo.lambda$0:java.lang.String(java.lang.String)"
-            case result => fail(s"Expected Binds edge from typeDecl but got $result")
+            case result => fail(s"Expected typeDecl but got $result")
           }
 
           erasedBinding.methodFullName shouldBe "Foo.lambda$0:java.lang.String(java.lang.String)"
           erasedBinding.signature shouldBe "java.lang.Object(java.lang.Object)"
-          erasedBinding.inE.collectAll[Binds].map(_.outNode().asInstanceOf[TypeDecl]).l match {
-            case List(typeDecl) =>
+          erasedBinding.inE.collectAll[Binds].map(_.outNode()).l match {
+            case List(typeDecl: TypeDecl) =>
               typeDecl.fullName shouldBe "Foo.lambda$0:java.lang.String(java.lang.String)"
-            case result => fail(s"Expected Binds edge from typeDecl but got $result")
+            case result => fail(s"Expected typeDecl but got $result")
           }
 
         case result => fail(s"Expected two bindings to apply method but got $result")
@@ -498,11 +496,11 @@ class LambdaTests extends JavaSrcCode2CpgFixture {
           lambdaBinding.methodFullName shouldBe "TestClass.lambda$0:java.lang.String(java.lang.Integer,java.lang.Float)"
           lambdaBinding.signature shouldBe "java.lang.String(java.lang.Integer,java.lang.Float)"
 
-          lambdaBinding.inE.collectAll[Binds].l match {
-            case List(bindsEdge) =>
-              bindsEdge.outNode().asInstanceOf[TypeDecl].fullName shouldBe "TestClass"
+          lambdaBinding.inE.collectAll[Binds].map(_.outNode()).l match {
+            case List(typeDecl: TypeDecl) =>
+              typeDecl.fullName shouldBe "TestClass"
 
-            case result => fail(s"Expected single BINDS in edge but got $result")
+            case result => fail(s"Expected single typeDecl but got $result")
           }
 
         case result => fail(s"Expected single binding for lambda method but got $result")
@@ -517,19 +515,17 @@ class LambdaTests extends JavaSrcCode2CpgFixture {
           val capturedLocal = cpg.method.name(".*lambda.*").local.name("captured").head
           capturedClosureBinding.closureBindingId shouldBe capturedLocal.closureBindingId
 
-          capturedClosureBinding.outE.collectAll[Ref].l match {
-            case List(outRef) =>
-              val capturedParam = outRef.inNode.asInstanceOf[MethodParameterIn]
+          capturedClosureBinding.outE.collectAll[Ref].map(_.inNode()).l match {
+            case List(capturedParam: MethodParameterIn) =>
               capturedParam.name shouldBe "captured"
               capturedParam.method.head.fullName shouldBe "TestClass.test:Foo(java.lang.String)"
-            case result => fail(s"Expected single REF outE from closureBinding to capturedParam but got $result")
+            case result => fail(s"Expected single capturedParam but got $result")
           }
 
-          capturedClosureBinding.inE.collectAll[Capture].l match {
-            case List(capture) =>
-              val outMethod = capture.outNode().asInstanceOf[MethodRef]
+          capturedClosureBinding.inE.collectAll[Capture].map(_.outNode()).l match {
+            case List(outMethod: MethodRef) =>
               outMethod.methodFullName shouldBe "TestClass.lambda$0:java.lang.String(java.lang.Integer,java.lang.Float)"
-            case result => fail(s"Expected single CAPTURE inE but got $result")
+            case result => fail(s"Expected single out METHOD_REF but got $result")
           }
 
         case result => fail(s"Expected 2 closure bindings for captured variables but got $result")
@@ -553,25 +549,25 @@ class LambdaTests extends JavaSrcCode2CpgFixture {
         case List(interfaceBinding, erasedBinding, binding) =>
           interfaceBinding.methodFullName shouldBe "Foo.baz:java.lang.String(java.lang.Object,java.lang.Object)"
           interfaceBinding.signature shouldBe "java.lang.String(java.lang.Object,java.lang.Object)"
-          binding.inE.collectAll[Binds].map(_.outNode().asInstanceOf[TypeDecl]).l match {
-            case List(typeDecl) => typeDecl.fullName shouldBe "Foo"
-            case result         => fail(s"Expected Binds edge from typeDecl but got $result")
+          binding.inE.collectAll[Binds].map(_.outNode()).l match {
+            case List(typeDecl: TypeDecl) => typeDecl.fullName shouldBe "Foo"
+            case result         => fail(s"Expected typeDecl but got $result")
           }
 
           binding.methodFullName shouldBe "TestClass.lambda$0:java.lang.String(java.lang.Integer,java.lang.Float)"
           binding.signature shouldBe "java.lang.String(java.lang.Integer,java.lang.Float)"
-          binding.inE.collectAll[Binds].map(_.outNode().asInstanceOf[TypeDecl]).l match {
-            case List(typeDecl) =>
+          binding.inE.collectAll[Binds].map(_.outNode()).l match {
+            case List(typeDecl: TypeDecl) =>
               typeDecl.fullName shouldBe "TestClass.lambda$0:java.lang.String(java.lang.Integer,java.lang.Float)"
-            case result => fail(s"Expected Binds edge from typeDecl but got $result")
+            case result => fail(s"Expected typeDecl but got $result")
           }
 
           erasedBinding.methodFullName shouldBe "TestClass.lambda$0:java.lang.String(java.lang.Integer,java.lang.Float)"
           erasedBinding.signature shouldBe "java.lang.Object(java.lang.Object,java.lang.Object)"
-          erasedBinding.inE.collectAll[Binds].map(_.outNode().asInstanceOf[TypeDecl]).l match {
-            case List(typeDecl) =>
+          erasedBinding.inE.collectAll[Binds].map(_.outNode()).l match {
+            case List(typeDecl: TypeDecl) =>
               typeDecl.fullName shouldBe "TestClass.lambda$0:java.lang.String(java.lang.Integer,java.lang.Float)"
-            case result => fail(s"Expected Binds edge from typeDecl but got $result")
+            case result => fail(s"Expected typeDecl but got $result")
           }
 
         case result => fail(s"Expected three bindings to baz method but got $result")
@@ -619,11 +615,11 @@ class LambdaTests extends JavaSrcCode2CpgFixture {
           lambdaBinding.methodFullName shouldBe "Foo.lambda$0:java.lang.String(java.lang.String)"
           lambdaBinding.signature shouldBe "java.lang.String(java.lang.String)"
 
-          lambdaBinding.inE.collectAll[Binds].l match {
-            case List(bindsEdge) =>
-              bindsEdge.outNode().asInstanceOf[TypeDecl].fullName shouldBe "Foo"
+          lambdaBinding.inE.collectAll[Binds].map(_.outNode()).l match {
+            case List(typeDecl: TypeDecl) =>
+              typeDecl.fullName shouldBe "Foo"
 
-            case result => fail(s"Expected single BINDS in edge but got $result")
+            case result => fail(s"Expected single typeDecl but got $result")
           }
 
         case result => fail(s"Expected single binding for lambda method but got $result")
@@ -646,18 +642,18 @@ class LambdaTests extends JavaSrcCode2CpgFixture {
         case List(erasedBinding, binding) =>
           binding.methodFullName shouldBe "Foo.lambda$0:java.lang.String(java.lang.String)"
           binding.signature shouldBe "java.lang.String(java.lang.String)"
-          binding.inE.collectAll[Binds].map(_.outNode().asInstanceOf[TypeDecl]).l match {
-            case List(typeDecl) =>
+          binding.inE.collectAll[Binds].map(_.outNode()).l match {
+            case List(typeDecl: TypeDecl) =>
               typeDecl.fullName shouldBe "Foo.lambda$0:java.lang.String(java.lang.String)"
-            case result => fail(s"Expected Binds edge from typeDecl but got $result")
+            case result => fail(s"Expected typeDecl but got $result")
           }
 
           erasedBinding.methodFullName shouldBe "Foo.lambda$0:java.lang.String(java.lang.String)"
           erasedBinding.signature shouldBe "java.lang.Object(java.lang.Object)"
-          erasedBinding.inE.collectAll[Binds].map(_.outNode().asInstanceOf[TypeDecl]).l match {
-            case List(typeDecl) =>
+          erasedBinding.inE.collectAll[Binds].map(_.outNode()).l match {
+            case List(typeDecl: TypeDecl) =>
               typeDecl.fullName shouldBe "Foo.lambda$0:java.lang.String(java.lang.String)"
-            case result => fail(s"Expected Binds edge from typeDecl but got $result")
+            case result => fail(s"Expected typeDecl but got $result")
           }
 
         case result => fail(s"Expected two bindings to apply method but got $result")
