@@ -4,11 +4,14 @@ import io.joern.x2cpg.passes.frontend.MetaDataPass
 import io.shiftleft.codepropertygraph.generated.EvaluationStrategies
 import io.shiftleft.codepropertygraph.generated.nodes.{
   ExpressionNew,
+  NewBlock,
   NewCall,
+  NewControlStructure,
   NewMethod,
   NewMethodParameterIn,
   NewMethodReturn,
-  NewNamespaceBlock
+  NewNamespaceBlock,
+  NewReturn
 }
 import io.shiftleft.semanticcpg.language.types.structure.NamespaceTraversal
 import overflowdb.BatchedUpdate.DiffGraphBuilder
@@ -54,13 +57,57 @@ abstract class AstCreatorBase(filename: String) {
 
   /** Create a method return node
     */
-  def methodReturnNode(line: Option[Integer], column: Option[Integer], tpe: String): NewMethodReturn =
+  def methodReturnNode(
+    line: Option[Integer],
+    column: Option[Integer],
+    tfn: String,
+    dtfn: Option[String] = None
+  ): NewMethodReturn =
     NewMethodReturn()
-      .typeFullName(tpe)
-      .code(tpe)
+      .typeFullName(tfn)
+      .dynamicTypeHintFullName(dtfn)
+      .code(tfn)
       .evaluationStrategy(EvaluationStrategies.BY_VALUE)
       .lineNumber(line)
       .columnNumber(column)
+
+  /** For a given return node and arguments, create an AST that represents the return instruction. The main purpose of
+    * this method is to automatically assign the correct argument indices.
+    */
+  def returnAst(returnNode: NewReturn, arguments: List[Ast] = List()): Ast = {
+    setArgumentIndices(arguments)
+    Ast(returnNode)
+      .withChildren(arguments)
+      .withArgEdges(returnNode, arguments.flatMap(_.root))
+  }
+
+  /** For a given node, condition AST and children ASTs, create an AST that represents the control structure. The main
+    * purpose of this method is to automatically assign the correct condition edges.
+    */
+  def controlStructureAst(
+    controlStructureNode: NewControlStructure,
+    condition: Option[Ast],
+    children: List[Ast] = List(),
+    placeConditionLast: Boolean = false
+  ): Ast = {
+    condition match {
+      case Some(conditionAst) =>
+        Ast(controlStructureNode)
+          .withChildren(if (placeConditionLast) children ++ List(conditionAst) else conditionAst :: children)
+          .withConditionEdges(controlStructureNode, List(conditionAst.root).flatten)
+      case _ =>
+        Ast(controlStructureNode)
+          .withChildren(children)
+    }
+  }
+
+  /** For a given block node and statement ASTs, create an AST that represents the block. The main purpose of this
+    * method is to increase the readability of the code which creates block asts.
+    */
+  def blockAst(blockNode: NewBlock, statements: List[Ast] = List()): Ast = {
+    Ast(blockNode)
+      .withChildren(statements)
+  }
 
   /** For a given call node, arguments, and optionally, a receiver, create an AST that represents the call site. The
     * main purpose of this method is to automatically assign the correct argument indices.
@@ -100,6 +147,15 @@ abstract class AstCreatorBase(filename: String) {
     nodes.toIndexedSeq.zipWithIndex.map { case (x, i) =>
       f(x, i + 1)
     }
+
+  def withArgumentIndex[T <: ExpressionNew](node: T, argIdxOpt: Option[Int]): T = {
+    argIdxOpt match {
+      case Some(argIdx) =>
+        node.argumentIndex = argIdx
+        node
+      case None => node
+    }
+  }
 
   /** Absolute path for the given file name
     */

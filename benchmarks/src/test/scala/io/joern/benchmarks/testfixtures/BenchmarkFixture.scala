@@ -21,7 +21,7 @@ import overflowdb.traversal.Traversal
 
 import scala.util.Failure
 
-class BenchmarkFixture(
+abstract class BenchmarkFixture(
   val pkg: String = "",
   val category: String = "",
   val benchmarkNo: String = "1",
@@ -30,7 +30,7 @@ class BenchmarkFixture(
     with Matchers
     with BeforeAndAfterAll {
 
-  val semanticsFile: String = ProjectRoot.relativise("dataflowengineoss/src/test/resources/default.semantics")
+  val semanticsFile: String = ProjectRoot.relativise("benchmarks/src/test/resources/default.semantics")
   lazy val defaultSemantics: Semantics           = Semantics.fromList(new Parser().parseFile(semanticsFile))
   implicit val resolver: ICallResolver           = NoResolve
   implicit lazy val engineContext: EngineContext = EngineContext(defaultSemantics, EngineConfig(maxCallDepth = 4))
@@ -42,10 +42,10 @@ class BenchmarkFixture(
   def constructTargetFilePath: String =
     s"benchmarks/src/test/resources/$pkg/${category.toLowerCase}"
 
-  private def getListOfFiles(dir: String): List[java.io.File] = {
+  protected def getListOfFiles(dir: String): List[java.io.File] = {
     val d = new java.io.File(dir)
     // Regex is useful for class files containing subclasses
-    val regex = s".*$category$benchmarkNo.*$fileExt"
+    val regex = s".*$category$benchmarkNo(?:\\$$[A-Za-z]*)?$fileExt"
     if (d.exists && d.isDirectory) {
       d.listFiles.filter(f => f.isFile && f.getAbsolutePath.matches(regex)).toList
     } else {

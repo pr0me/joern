@@ -3,6 +3,7 @@ package io.joern.javasrc2cpg.passes
 import com.github.javaparser.ast.`type`.TypeParameter
 import com.github.javaparser.ast.{CompilationUnit, Node, NodeList, PackageDeclaration}
 import com.github.javaparser.ast.body.{
+  AnnotationDeclaration,
   BodyDeclaration,
   CallableDeclaration,
   ConstructorDeclaration,
@@ -77,6 +78,7 @@ import com.github.javaparser.ast.stmt.{
 import com.github.javaparser.resolution.{SymbolResolver, UnsolvedSymbolException}
 import com.github.javaparser.resolution.declarations.{
   ResolvedConstructorDeclaration,
+  ResolvedFieldDeclaration,
   ResolvedMethodDeclaration,
   ResolvedMethodLikeDeclaration,
   ResolvedReferenceTypeDeclaration,
@@ -88,7 +90,14 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import com.github.javaparser.symbolsolver.model.typesystem.LazyType
 import io.joern.javasrc2cpg.util.BindingTable.createBindingTable
 import io.joern.javasrc2cpg.util.Scope.WildcardImportName
-import io.joern.javasrc2cpg.util.{BindingTable, BindingTableEntry, NodeTypeInfo, Scope, TypeInfoCalculator}
+import io.joern.javasrc2cpg.util.{
+  BindingTable,
+  BindingTableAdapterForJavaparser,
+  BindingTableEntry,
+  NodeTypeInfo,
+  Scope,
+  TypeInfoCalculator
+}
 import io.joern.javasrc2cpg.util.TypeInfoCalculator.{TypeConstants, UnresolvedTypeDefault}
 import io.shiftleft.codepropertygraph.generated.{
   ControlStructureTypes,
@@ -342,11 +351,15 @@ class AstCreator(filename: String, javaParserAst: CompilationUnit, global: Globa
     typeParamValues: ResolvedTypeParametersMap
   ): collection.Seq[String] = {
     val parameterTypes =
-      Range(0, methodLike.getNumberOfParams).map(methodLike.getParam).map { param =>
-        Try(param.getType).toOption
-          .map(paramType => typeInfoCalc.fullName(paramType, typeParamValues))
-          .getOrElse(UnresolvedTypeDefault)
-      }
+      Range(0, methodLike.getNumberOfParams)
+        .flatMap { index =>
+          Try(methodLike.getParam(index)).toOption
+        }
+        .map { param =>
+          Try(param.getType).toOption
+            .map(paramType => typeInfoCalc.fullName(paramType, typeParamValues))
+            .getOrElse(UnresolvedTypeDefault)
+        }
 
     parameterTypes
   }
@@ -359,7 +372,13 @@ class AstCreator(filename: String, javaParserAst: CompilationUnit, global: Globa
     val fullName = typeInfoCalc.fullName(typeDecl)
     bindingTableCache.getOrElseUpdate(
       fullName,
-      createBindingTable(fullName, typeDecl, getBindingTable, methodSignature)
+      createBindingTable(
+        fullName,
+        typeDecl,
+        getBindingTable,
+        methodSignature,
+        new BindingTableAdapterForJavaparser(methodSignature)
+      )
     )
   }
 
@@ -600,9 +619,15 @@ class AstCreator(filename: String, javaParserAst: CompilationUnit, global: Globa
       .withChildren(annotationAsts)
       .withChildren(clinitAst.toSeq)
 
-    Try(typ.resolve()).toOption.foreach { resolvedTypeDecl =>
-      val bindingTable = getBindingTable(resolvedTypeDecl)
-      createBindingNodes(typeDecl, bindingTable)
+    // Annotation declarations need no binding table as objects of this
+    // typ never get called from user code.
+    // Furthermore the parser library throws an exception when trying to
+    // access e.g. the declared methods of an annotation declaration.
+    if (!typ.isInstanceOf[AnnotationDeclaration]) {
+      Try(typ.resolve()).toOption.foreach { resolvedTypeDecl =>
+        val bindingTable = getBindingTable(resolvedTypeDecl)
+        createBindingNodes(typeDecl, bindingTable)
+      }
     }
 
     scopeStack.popScope()
@@ -1942,7 +1967,7 @@ class AstCreator(filename: String, javaParserAst: CompilationUnit, global: Globa
 
         val identifierTypeFullName =
           value match {
-            case fieldDecl: JavaParserFieldDeclaration =>
+            case fieldDecl: ResolvedFieldDeclaration =>
               // TODO It is not quite correct to use the declaring classes type.
               // Instead we should take the using classes type which is either the same or a
               // sub class of the declaring class.
