@@ -21,7 +21,7 @@ object TestabilityTarpit extends QueryBundle {
             |""".stripMargin,
       score = 2,
       withStrRep({ cpg =>
-        cpg.call(".*BIND_STATIC.*")
+        cpg.method.filterNot(_.isExternal).code(".*\\.\\.\\..*")
       }),
       codeExamples = CodeExamples(
         List("""
@@ -43,7 +43,7 @@ object TestabilityTarpit extends QueryBundle {
             |sum('a', 'b', 'c', b);
             |""".stripMargin),
         List("""
-            |
+            |// could be refactored to:
             |function sum(v1, v2, v3, v4, v5){
             |    res.writeHead(200, {"Content-Type" : "text/html"});
             |    out(v1);
