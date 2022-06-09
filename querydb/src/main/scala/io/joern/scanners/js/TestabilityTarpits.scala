@@ -68,4 +68,58 @@ object TestabilityTarpit extends QueryBundle {
       tags = List(QueryTags.testabilityTarpit, QueryTags.xss)
     )
 
+  @q
+  def functionAsArg(): Query =
+    Query.make(
+      name = "callback-function",
+      author = Crew.lukas,
+      title = "Tarpit: Passing a function as an argument",
+      description = """
+            | The function is assigned to a variable and passed as a parameter to another function. 
+            | Call a function "dynamically" may lead to instances in which static analyzers do not find XSS vulnerabilities.
+            |""".stripMargin,
+      score = 2,
+      withStrRep({ cpg =>
+        var n = cpg.method.name.l
+        cpg.argument.isIdentifier.name.filter(x => n.contains(x)).l
+      }),
+      codeExamples = CodeExamples(
+        List("""
+            |
+            |function MyFunction(n) {
+            |    return n;
+            |}
+            | 
+            | function print(n, message) {
+            |    res.writeHead(200, {"Content-Type" : "text/html"});
+            |    res.write(message(n)); 
+            |    res.end();
+            | }
+            |
+            |const parsed = route.parse(req.url);
+            |const query  = querystring.parse(parsed.query);
+            |var n = query.name;
+            |print(n, MyFunction);
+            |""".stripMargin),
+        List("""
+            |// could be refactored to:
+            |function MyFunction(n) {
+            |    return n;
+            |}
+            | 
+            | function print(n) {
+            |    res.writeHead(200, {"Content-Type" : "text/html"});
+            |    res.write(MyFunction(n)); 
+            |    res.end();
+            | }
+            |
+            |const parsed = route.parse(req.url);
+            |const query  = querystring.parse(parsed.query);
+            |const n = query.name;
+            |print(n);
+            |""".stripMargin)
+      ),
+      tags = List(QueryTags.testabilityTarpit, QueryTags.xss)
+    )
+
 }
