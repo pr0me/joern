@@ -33,7 +33,7 @@ object TestabilityTarpit extends QueryBundle {
             |}
             |
             |function out(val){
-            |    // XSS vulnerability
+            |    // XSS vulnerability not found by 4/5 scanners
             |    res.write(val); 
             |}
             |
@@ -55,7 +55,7 @@ object TestabilityTarpit extends QueryBundle {
             |}
             |
             |function out(val){
-            |    // XSS vulnerability
+            |    // XSS vulnerability can now be found
             |    res.write(val); 
             |}
             |
@@ -92,6 +92,8 @@ object TestabilityTarpit extends QueryBundle {
             | 
             |function print(n, message) {
             |    res.writeHead(200, {"Content-Type" : "text/html"});
+            |
+            |    // XSS vulnerability not found by 4/5 scanners
             |    res.write(message(n)); 
             |    res.end();
             |}

@@ -28,18 +28,28 @@ object TestabilityTarpit extends QueryBundle {
             |
             |<?php
             |
-            |function F($a){
-            |    static $b = 'abc';
+            |function F($a, $b='abc'){
             |    echo $b;
-            |    $b = $a;
+            |    return $a;
             |}
             |
             |$a = $_GET["p1"];
             |F($a);
+            |// XSS through static variable, found by 0/6 scanners 
             |F('abc');
             |""".stripMargin),
         List("""
+            |<?php
+            |// possible refactoring for better analyzability:
             |
+            |function F($a, $b='abc'){
+            |    echo $b;
+            |    return $a;
+            |}
+            |
+            |$a = "alert(1);";
+            |$b = F($a);
+            |F('abc', $b);
             |""".stripMargin)
       ),
       tags = List(QueryTags.testabilityTarpit, QueryTags.xss)
@@ -66,7 +76,7 @@ object TestabilityTarpit extends QueryBundle {
             |<?php
             |function sum() {
             |    // it will print all the parameters
-            |    // XSS vulnerability with the last element $b
+            |    // XSS vulnerability with the last element $b, found by 2/6 scanners
             |    foreach (func_get_args() as $n) {
             |        echo $n;
             |    }
@@ -161,7 +171,7 @@ object TestabilityTarpit extends QueryBundle {
             |$obj = new MethodTest;
             |
             |// Will call the __call() function
-            |// and print the argument $b => XSS 
+            |// and print the argument $b => XSS, found by 0/6 scanners
             |$obj->runTest('arg1',$b);
             |""".stripMargin),
         List("""
