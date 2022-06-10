@@ -1,4 +1,4 @@
-package io.joern.scanners.jssrc
+package io.joern.scanners.js
 
 import io.joern.scanners._
 import io.joern.console._
@@ -76,12 +76,12 @@ object TestabilityTarpit extends QueryBundle {
       title = "Tarpit: Passing a function as an argument",
       description = """
             | The function is assigned to a variable and passed as a parameter to another function. 
-            | Call a function "dynamically" may lead to instances in which static analyzers do not find XSS vulnerabilities.
+            | Calling a function "dynamically" may lead to instances in which static analyzers do not find XSS vulnerabilities.
             |""".stripMargin,
       score = 2,
       withStrRep({ cpg =>
         var n = cpg.method.name.l
-        cpg.argument.isIdentifier.name.filter(x => n.contains(x)).l
+        cpg.method.filterNot(_.isExternal).callIn.argument.isIdentifier.filter(x => n.contains(x.name))
       }),
       codeExamples = CodeExamples(
         List("""
@@ -90,11 +90,11 @@ object TestabilityTarpit extends QueryBundle {
             |    return n;
             |}
             | 
-            | function print(n, message) {
+            |function print(n, message) {
             |    res.writeHead(200, {"Content-Type" : "text/html"});
             |    res.write(message(n)); 
             |    res.end();
-            | }
+            |}
             |
             |const parsed = route.parse(req.url);
             |const query  = querystring.parse(parsed.query);
@@ -103,15 +103,16 @@ object TestabilityTarpit extends QueryBundle {
             |""".stripMargin),
         List("""
             |// could be refactored to:
+            |
             |function MyFunction(n) {
             |    return n;
             |}
             | 
-            | function print(n) {
+            |function print(n) {
             |    res.writeHead(200, {"Content-Type" : "text/html"});
             |    res.write(MyFunction(n)); 
             |    res.end();
-            | }
+            |}
             |
             |const parsed = route.parse(req.url);
             |const query  = querystring.parse(parsed.query);
