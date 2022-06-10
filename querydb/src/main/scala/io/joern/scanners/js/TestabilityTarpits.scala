@@ -125,4 +125,45 @@ object TestabilityTarpit extends QueryBundle {
       tags = List(QueryTags.testabilityTarpit, QueryTags.xss)
     )
 
+  @q
+  def objectCreateUsed(): Query =
+    Query.make(
+      name = "object-create",
+      author = Crew.lukas,
+      title = "Tarpit: Using a local existing object as prototype of newly created object",
+      description = """
+            | Object.create permits to create an object, using an existing object as the prototype of the newly created object.
+            | If the original object carries user-supplied data, this may lead to undetected XSS vulnerabilities.
+            |""".stripMargin,
+      score = 2,
+      withStrRep({ cpg =>
+        var assignments = cpg.method(".*assignment.*").callIn.argument.isIdentifier.name.toSet
+
+        cpg.method.filter(_.fullName == "Object.create").callIn.argument.isIdentifier.filter(x => assignments.contains(x.name)).astParent
+      }),
+      codeExamples = CodeExamples(
+        List("""
+            |
+            |const parsed = route.parse(req.url); 
+            |const query = querystring.parse(parsed.query); 
+            |let b = query.name; 
+            |
+            |const obj = {
+            |    name:b
+            |};
+            |          
+            |const obj2 = Object.create(obj); 
+            |
+            |res.writeHead(200, {"Content-Type" : "text/html"});
+            |
+            |// XSS undetected by 3/5 scanners
+            |res.write(obj2.name);
+            |res.end();
+            |""".stripMargin),
+        List("""
+            |""".stripMargin)
+      ),
+      tags = List(QueryTags.testabilityTarpit, QueryTags.xss)
+    )
+
 }
