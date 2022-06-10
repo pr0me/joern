@@ -166,4 +166,41 @@ object TestabilityTarpit extends QueryBundle {
       tags = List(QueryTags.testabilityTarpit, QueryTags.xss)
     )
 
+  @q
+  def objectAssignmentUsed(): Query =
+    Query.make(
+      name = "object-assign",
+      author = Crew.lukas,
+      title = "Tarpit: Assignement between two objects",
+      description = """
+            | When assigning between two objects, changes on one affect the other.
+            | This may lead to aggravated analyzability for static vulnerability scanners.
+            |""".stripMargin,
+      score = 2,
+      withStrRep({ cpg =>
+        var new_objects = cpg.method(".*assignment.*").callIn.code(".*= new.*").argument.isIdentifier.name.l
+
+        cpg.method(".*assignment.*").callIn.argument.isIdentifier.filter(x => new_objects.contains(x.name)).filter(x => x.order == 2).astParent
+      }),
+      codeExamples = CodeExamples(
+        List("""
+            |class myClass { 
+            |    b = 'safe';
+            |}
+            |const parsed = route.parse(req.url); 
+            |const query = querystring.parse(parsed.query); 
+            |obj1 = new myClass(); 
+            |obj2 = obj1; 
+            |obj2.b = query.name;
+            |// XSS
+            |res.writeHead(200, {"Content-Type" : "text/html"}); 
+            |res.write(obj1.b);
+            |res.end();
+            |""".stripMargin),
+        List("""
+            |""".stripMargin)
+      ),
+      tags = List(QueryTags.testabilityTarpit, QueryTags.xss)
+    )
+
 }
