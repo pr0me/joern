@@ -139,7 +139,13 @@ object TestabilityTarpit extends QueryBundle {
       withStrRep({ cpg =>
         var assignments = cpg.method(".*assignment.*").callIn.argument.isIdentifier.name.toSet
 
-        cpg.method.filter(_.fullName == "Object.create").callIn.argument.isIdentifier.filter(x => assignments.contains(x.name)).astParent
+        cpg.method
+          .filter(_.fullName == "Object.create")
+          .callIn
+          .argument
+          .isIdentifier
+          .filter(x => assignments.contains(x.name))
+          .astParent
       }),
       codeExamples = CodeExamples(
         List("""
@@ -180,7 +186,14 @@ object TestabilityTarpit extends QueryBundle {
       withStrRep({ cpg =>
         var new_objects = cpg.method(".*assignment.*").callIn.code(".*= new.*").argument.isIdentifier.name.l
 
-        cpg.method(".*assignment.*").callIn.argument.isIdentifier.filter(x => new_objects.contains(x.name)).filter(x => x.order == 2).astParent
+        cpg
+          .method(".*assignment.*")
+          .callIn
+          .argument
+          .isIdentifier
+          .filter(x => new_objects.contains(x.name))
+          .filter(x => x.order == 2)
+          .astParent
       }),
       codeExamples = CodeExamples(
         List("""
@@ -195,6 +208,43 @@ object TestabilityTarpit extends QueryBundle {
             |// XSS
             |res.writeHead(200, {"Content-Type" : "text/html"}); 
             |res.write(obj1.b);
+            |res.end();
+            |""".stripMargin),
+        List("""
+            |""".stripMargin)
+      ),
+      tags = List(QueryTags.testabilityTarpit, QueryTags.xss)
+    )
+
+  @q
+  def bindMethodUsed(): Query =
+    Query.make(
+      name = "bind-method",
+      author = Crew.lukas,
+      title = "Tarpit: Function creation through bind() method",
+      description = """
+            | The bind() method creates a new function that, when called, has its `this` keyword set to the provided value.
+            | This can lead to obfuscated data flow, which may lead to undetected XSS vulnerabilities.
+            |""".stripMargin,
+      score = 2,
+      withStrRep({ cpg =>
+        cpg.call.code(".*\\.bind\\(.*\\)")
+      }),
+      codeExamples = CodeExamples(
+        List("""
+            |function getX(x){
+            |    return x;
+            |}
+            |
+            |const parsed = route.parse(req.url);
+            |const query  = querystring.parse(parsed.query);
+            |let b = query.name;
+            |
+            |const boundGetX = getX.bind();
+            |
+            |res.writeHead(200, {"Content-Type" : "text/html"});
+            |//XSS, undetected by 4/5 scanners
+            |res.write(boundGetX(b));
             |res.end();
             |""".stripMargin),
         List("""
