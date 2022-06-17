@@ -81,7 +81,7 @@ object TestabilityTarpit extends QueryBundle {
       score = 2,
       withStrRep({ cpg =>
         var n = cpg.method.name.l
-        cpg.method.filterNot(_.isExternal).callIn.argument.isIdentifier.filter(x => n.contains(x.name))
+        cpg.method.filterNot(_.isExternal).callIn.argument.isIdentifier.filter(x => n.contains(x.name)).parentExpression
       }),
       codeExamples = CodeExamples(
         List("""

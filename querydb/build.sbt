@@ -10,7 +10,7 @@ dependsOn(
   Projects.c2cpg      % "test->test",
   Projects.fuzzyc2cpg % "test->test",
   Projects.php2cpg,
-  Projects.jssrc2cpg,
+  Projects.jssrc2cpg  % "test->test",
 )
 
 libraryDependencies ++= Seq(
