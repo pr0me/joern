@@ -8,7 +8,8 @@ dependsOn(
   Projects.ghidra2cpg,
   Projects.ghidra2cpg % "test->test",
   Projects.c2cpg      % "test->test",
-  Projects.fuzzyc2cpg % "test->test"
+  Projects.fuzzyc2cpg % "test->test",
+  Projects.jssrc2cpg  % "test->test"
 )
 
 libraryDependencies ++= Seq(
