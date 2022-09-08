@@ -18,7 +18,7 @@ class C2Cpg extends X2CpgFrontend[Config] {
   private val report: Report = new Report()
 
   def createCpg(config: Config): Try[Cpg] = {
-    new DependencyGraphBuilder(config.inputPath).getEdges()
+    new DependencyGraphBuilder(config.inputPath)
     withNewEmptyCpg(config.outputPath, config) { (cpg, config) =>
       new MetaDataPass(cpg, Languages.NEWC, config.inputPath).createAndApply()
       new AstCreationPass(cpg, AstCreationPass.SourceFiles, config, report).createAndApply()

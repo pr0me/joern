@@ -7,7 +7,7 @@ import io.joern.c2cpg.parser.FileDefaults
 class Node(filename: String) {
   object Done extends Exception {}
 
-  val name = filename
+  val name = filename.split("/").last
   val includes = getIncludes(filename)
   val filetype = if (filename.endsWith(".c") || filename.endsWith(".cpp"))
         "source"
@@ -19,10 +19,9 @@ class Node(filename: String) {
     val regex = """#include\s*["<](.*)[">]""".r 
     val includeList = scala.io.Source.fromFile(currFile)
       .getLines()
-      .collect { case regex(value) => value }
+      .collect{ case regex(value) => value }
       .toList
 
-    println(filename)
     println(includeList)
 
     includeList
@@ -32,6 +31,7 @@ class Node(filename: String) {
 class Edge(start: Node, end: Node) {
   def getStart(): String = start.name
   def getEnd(): String = end.name
+  def print(): Unit = println(s"${getStart()} -> ${getEnd()}")
 }
 
 class DependencyGraphBuilder(inputPath: String) {
@@ -39,7 +39,7 @@ class DependencyGraphBuilder(inputPath: String) {
   val edges = getEdges()
 
   def getFiles(): Array[String] = {
-    val sourceFiles = SourceFiles.determine(inputPath, FileDefaults.SOURCE_FILE_EXTENSIONS).toSet
+    val sourceFiles            = SourceFiles.determine(inputPath, FileDefaults.SOURCE_FILE_EXTENSIONS).toSet
     val allHeaderFiles         = SourceFiles.determine(inputPath, FileDefaults.HEADER_FILE_EXTENSIONS).toSet
     val alreadySeenHeaderFiles = CGlobal.headerFiles
     val headerFiles = allHeaderFiles -- alreadySeenHeaderFiles
@@ -56,14 +56,15 @@ class DependencyGraphBuilder(inputPath: String) {
   }
 
   def getEdges(): Array[Edge] = {
-    val edges = nodes.flatMap(startNode => startNode.includes.map(include => findNode(nodes, include) match {
-        case Some(endNode) => new Edge(startNode, endNode)
-      }
-    ))
+    val edges = this.nodes
+      .flatMap(startNode => startNode.includes.map(include => findNode(include))
+      .collect{ case Some(endNode) => new Edge(startNode, endNode) })
+
+    edges.map(e => e.print())
     edges
   }
 
-  def findNode(nodes: Array[Node], filename: String): Option[Node] = {
-    nodes.find(node => node.name == filename)
+  def findNode(name: String): Option[Node] = {
+    this.nodes.find(node => node.name == name)
   }
 }
