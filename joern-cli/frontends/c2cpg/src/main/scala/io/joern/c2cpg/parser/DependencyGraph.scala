@@ -29,14 +29,25 @@ class Node(filename: String) {
 }
 
 class Edge(start: Node, end: Node) {
-  def getStart(): String = start.name
-  def getEnd(): String = end.name
-  def print(): Unit = println(s"${getStart()} -> ${getEnd()}")
+  def getStart(): Node = start
+  def getEnd(): Node = end
+
+  override def toString: String =
+    s"${getStart().name} -> ${getEnd().name}"
 }
 
-class DependencyGraphBuilder(inputPath: String) {
-  val nodes = getNodes()
-  val edges = getEdges()
+class DependencyGraph(inputPath: String, kDistance: Int) {
+  var nodes: Array[Node] = Array()
+  var edges: Array[Edge] = Array()
+
+  def compute(): Unit = {
+    this.nodes = getNodes()
+    this.edges = getEdges()
+
+    if (kDistance > 1) {
+      addTransitiveEdges()
+    }
+  }
 
   def getFiles(): Array[String] = {
     val sourceFiles            = SourceFiles.determine(inputPath, FileDefaults.SOURCE_FILE_EXTENSIONS).toSet
@@ -57,14 +68,22 @@ class DependencyGraphBuilder(inputPath: String) {
 
   def getEdges(): Array[Edge] = {
     val edges = this.nodes
-      .flatMap(startNode => startNode.includes.map(include => findNode(include))
+      .flatMap(startNode => startNode.includes.map(include => findNode(nodes, include))
       .collect{ case Some(endNode) => new Edge(startNode, endNode) })
 
-    edges.map(e => e.print())
+    edges.map(e => println(e))
     edges
   }
 
-  def findNode(name: String): Option[Node] = {
-    this.nodes.find(node => node.name == name)
+  def addTransitiveEdges(): Unit = {
+    // val transitiveEdges = this.edges
+    //   .flatMap(edge => edge.getEnd().includes.map(include => findNode(this.nodes, include))
+    //   .collect{ case Some(endNode) => new Edge(edge.getEnd(), endNode) })
+
+    // transitiveEdges.map(e => println(e))
+  }
+
+  def findNode(nodes: Array[Node], name: String): Option[Node] = {
+    nodes.find(node => node.name == name)
   }
 }
