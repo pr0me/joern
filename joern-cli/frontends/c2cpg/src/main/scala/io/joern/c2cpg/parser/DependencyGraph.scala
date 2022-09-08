@@ -9,6 +9,7 @@ class Node(filename: String) {
 
   val name = filename.split("/").last
   val includes = getIncludes(filename)
+  var edges: scala.collection.mutable.Set[Edge] = scala.collection.mutable.Set()
   val filetype = if (filename.endsWith(".c") || filename.endsWith(".cpp"))
         "source"
       else if (filename.endsWith(".h") || filename.endsWith(".hpp"))
@@ -39,10 +40,6 @@ class Edge(start: Node, end: Node) {
   override def equals(that: Any): Boolean =
     that match {
         case that: Edge => {
-            println("Comparing:")
-            println(this)
-            println(that)
-            println("_____________")
             that.canEqual(this) &&
             this.hashCode == that.hashCode
         }
@@ -90,8 +87,8 @@ class DependencyGraph(inputPath: String, kDistance: Int) {
     nodes
   }
 
+  // add transitive edges
   def getEdges(kDistance: Int): Set[Edge] = {
-    // add transitive edges
     var edges: Array[Edge] = Array()
     for (currNode <- this.nodes) {
       var allNextNodes = Array(currNode)
@@ -99,9 +96,12 @@ class DependencyGraph(inputPath: String, kDistance: Int) {
         allNextNodes = allNextNodes.flatMap(v => v.includes.map(include => findNode(include))
           .collect{ case Some(nextNode) => nextNode })
 
-        edges = edges ++ allNextNodes.map(nextNode => new Edge(currNode, nextNode))
+        edges = edges ++ allNextNodes.map(nextNode => {
+          val newEdge = new Edge(currNode, nextNode)
+          currNode.edges += newEdge
+          newEdge
+        })
       }
-
     }
     
     edges.toSet
