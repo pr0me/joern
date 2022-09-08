@@ -14,6 +14,8 @@ class Node(filename: String) {
       else if (filename.endsWith(".h") || filename.endsWith(".hpp"))
         "header"
 
+  def getFilename(): String = filename
+
   def getIncludes(filename: String): List[String] = {
     val currFile: java.io.File = new java.io.File(filename)
     val regex = """#include\s*["<](.*)[">]""".r 
@@ -32,21 +34,42 @@ class Edge(start: Node, end: Node) {
   def getStart(): Node = start
   def getEnd(): Node = end
 
+  def canEqual(a: Any) = a.isInstanceOf[Edge]
+
+  override def equals(that: Any): Boolean =
+    that match {
+        case that: Edge => {
+            println("Comparing:")
+            println(this)
+            println(that)
+            println("_____________")
+            that.canEqual(this) &&
+            this.hashCode == that.hashCode
+        }
+        case _ => false
+    }
+
+  override def hashCode: Int = {
+        val prime = 31
+        var result = 1
+        result = prime * result + start.getFilename().hashCode + end.getFilename().hashCode
+        result
+  }
+
   override def toString: String =
     s"${getStart().name} -> ${getEnd().name}"
 }
 
 class DependencyGraph(inputPath: String, kDistance: Int) {
   var nodes: Array[Node] = Array()
-  var edges: Array[Edge] = Array()
+  var edges: Set[Edge] = Set()
 
   def compute(): Unit = {
     this.nodes = getNodes()
-    this.edges = getEdges()
+    this.edges = getEdges(kDistance)
 
-    if (kDistance > 1) {
-      addTransitiveEdges()
-    }
+    println("Edges:")
+    edges.map(e => println(e))
   }
 
   def getFiles(): Array[String] = {
@@ -63,27 +86,28 @@ class DependencyGraph(inputPath: String, kDistance: Int) {
   def getNodes(): Array[Node] = {
     val files = getFiles()
     val nodes = files.map(file => new Node(file))
+    
     nodes
   }
 
-  def getEdges(): Array[Edge] = {
-    val edges = this.nodes
-      .flatMap(startNode => startNode.includes.map(include => findNode(nodes, include))
-      .collect{ case Some(endNode) => new Edge(startNode, endNode) })
+  def getEdges(kDistance: Int): Set[Edge] = {
+    // add transitive edges
+    var edges: Array[Edge] = Array()
+    for (currNode <- this.nodes) {
+      var allNextNodes = Array(currNode)
+      for (_ <- 0 until kDistance) {
+        allNextNodes = allNextNodes.flatMap(v => v.includes.map(include => findNode(include))
+          .collect{ case Some(nextNode) => nextNode })
 
-    edges.map(e => println(e))
-    edges
+        edges = edges ++ allNextNodes.map(nextNode => new Edge(currNode, nextNode))
+      }
+
+    }
+    
+    edges.toSet
   }
 
-  def addTransitiveEdges(): Unit = {
-    // val transitiveEdges = this.edges
-    //   .flatMap(edge => edge.getEnd().includes.map(include => findNode(this.nodes, include))
-    //   .collect{ case Some(endNode) => new Edge(edge.getEnd(), endNode) })
-
-    // transitiveEdges.map(e => println(e))
-  }
-
-  def findNode(nodes: Array[Node], name: String): Option[Node] = {
-    nodes.find(node => node.name == name)
+  def findNode(name: String): Option[Node] = {
+    this.nodes.find(node => node.name == name)
   }
 }
