@@ -12,12 +12,23 @@ class TsAstCreationPassTest extends AbstractPassTest {
     "have correct structure for casts" in AstFixture(
       """
         | const x = "foo" as string;
+        | var y = 1 as int;
+        | let z = true as boolean;
         |""".stripMargin,
       "code.ts"
     ) { cpg =>
-      inside(cpg.call(Operators.cast).l) { case List(call) =>
-        call.argument(1).code shouldBe "string"
-        call.argument(2).code shouldBe "\"foo\""
+      cpg.call(Operators.assignment).code.l shouldBe List(
+        "const x = \"foo\" as string",
+        "var y = 1 as int",
+        "let z = true as boolean"
+      )
+      inside(cpg.call(Operators.cast).l) { case List(callX, callY, callZ) =>
+        callX.argument(1).code shouldBe "string"
+        callX.argument(2).code shouldBe "\"foo\""
+        callY.argument(1).code shouldBe "int"
+        callY.argument(2).code shouldBe "1"
+        callZ.argument(1).code shouldBe "boolean"
+        callZ.argument(2).code shouldBe "true"
       }
     }
 
@@ -83,7 +94,7 @@ class TsAstCreationPassTest extends AbstractPassTest {
         direction.fullName shouldBe "code.ts::program:Direction"
         direction.filename shouldBe "code.ts"
         direction.file.name.head shouldBe "code.ts"
-        inside(direction.method.name("<sinit>").l) { case List(init) =>
+        inside(direction.method.name(io.joern.x2cpg.Defines.StaticInitMethodName).l) { case List(init) =>
           init.block.astChildren.isCall.code.head shouldBe "Up = 1"
         }
         inside(cpg.typeDecl("Direction").member.l) { case List(up, down, left, right) =>
@@ -120,9 +131,9 @@ class TsAstCreationPassTest extends AbstractPassTest {
         greeter.fullName shouldBe "code.ts::program:Greeter"
         greeter.filename shouldBe "code.ts"
         greeter.file.name.head shouldBe "code.ts"
-        val constructor = greeter.method.name("<constructor>").head
+        val constructor = greeter.method.nameExact(io.joern.x2cpg.Defines.ConstructorMethodName).head
         greeter.method.isConstructor.head shouldBe constructor
-        constructor.fullName shouldBe "code.ts::program:Greeter:<constructor>"
+        constructor.fullName shouldBe s"code.ts::program:Greeter:${io.joern.x2cpg.Defines.ConstructorMethodName}"
         inside(cpg.typeDecl("Greeter").member.l) { case List(greeting, greet) =>
           greeting.name shouldBe "greeting"
           greeting.code shouldBe "greeting: string;"
@@ -149,8 +160,8 @@ class TsAstCreationPassTest extends AbstractPassTest {
         greeter.fullName shouldBe "code.ts::program:Greeter"
         greeter.filename shouldBe "code.ts"
         greeter.file.name.head shouldBe "code.ts"
-        val constructor = greeter.method.name("<constructor>").head
-        constructor.fullName shouldBe "code.ts::program:Greeter:<constructor>"
+        val constructor = greeter.method.nameExact(io.joern.x2cpg.Defines.ConstructorMethodName).head
+        constructor.fullName shouldBe s"code.ts::program:Greeter:${io.joern.x2cpg.Defines.ConstructorMethodName}"
         greeter.method.isConstructor.head shouldBe constructor
         inside(cpg.typeDecl("Greeter").member.l) { case List(greeting) =>
           greeting.name shouldBe "greeting"
@@ -170,11 +181,10 @@ class TsAstCreationPassTest extends AbstractPassTest {
         |""".stripMargin,
       "code.ts"
     ) { cpg =>
-      inside(cpg.typeDecl.name("Greeter.*").l) { case List(greeter, greeterMeta) =>
-        greeterMeta.name shouldBe "Greeter<meta>"
+      inside(cpg.typeDecl.name("Greeter.*").l) { case List(greeter) =>
         greeter.name shouldBe "Greeter"
         cpg.typeDecl.isAbstract.head shouldBe greeter
-        greeterMeta.member.isStatic.head shouldBe greeterMeta.member.name("a").head
+        greeter.member.isStatic.head shouldBe greeter.member.name("a").head
         greeter.member.isPrivate.head shouldBe greeter.member.name("b").head
         greeter.member.isPublic.head shouldBe greeter.member.name("c").head
         greeter.member.isProtected.head shouldBe greeter.member.name("d").head
@@ -190,8 +200,8 @@ class TsAstCreationPassTest extends AbstractPassTest {
     ) { cpg =>
       cpg.method.fullName.l shouldBe List(
         "code.ts::program",
-        "code.ts::program:A:<constructor>",
-        "code.ts::program:B:<constructor>"
+        s"code.ts::program:A:${io.joern.x2cpg.Defines.ConstructorMethodName}",
+        s"code.ts::program:B:${io.joern.x2cpg.Defines.ConstructorMethodName}"
       )
     }
 
@@ -227,8 +237,8 @@ class TsAstCreationPassTest extends AbstractPassTest {
           func.dynamicTypeHintFullName.head shouldBe "code.ts::program:Greeter:anonymous"
         }
         inside(cpg.typeDecl("Greeter").method.l) { case List(constructor, anon) =>
-          constructor.name shouldBe "<constructor>"
-          constructor.fullName shouldBe "code.ts::program:Greeter:<constructor>"
+          constructor.name shouldBe io.joern.x2cpg.Defines.ConstructorMethodName
+          constructor.fullName shouldBe s"code.ts::program:Greeter:${io.joern.x2cpg.Defines.ConstructorMethodName}"
           constructor.code shouldBe "new: Greeter"
           greeter.method.isConstructor.head shouldBe constructor
           anon.name shouldBe "anonymous"
@@ -255,8 +265,8 @@ class TsAstCreationPassTest extends AbstractPassTest {
         greeter.filename shouldBe "code.ts"
         greeter.file.name.head shouldBe "code.ts"
         inside(cpg.typeDecl("Greeter").method.l) { case List(constructor) =>
-          constructor.name shouldBe "<constructor>"
-          constructor.fullName shouldBe "code.ts::program:Greeter:<constructor>"
+          constructor.name shouldBe io.joern.x2cpg.Defines.ConstructorMethodName
+          constructor.fullName shouldBe s"code.ts::program:Greeter:${io.joern.x2cpg.Defines.ConstructorMethodName}"
           constructor.code shouldBe "new (param: string) : Greeter"
           constructor.parameter.name.l shouldBe List("this", "param")
           constructor.parameter.code.l shouldBe List("this", "param: string")

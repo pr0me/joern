@@ -2,6 +2,7 @@ package io.joern.joerncli
 
 import io.joern.joerncli.CpgBasedTool.exitIfInvalid
 import io.shiftleft.codepropertygraph.Cpg
+import io.shiftleft.codepropertygraph.generated.PropertyNames
 import io.shiftleft.codepropertygraph.generated.nodes.{AstNode, Method}
 
 import scala.util.Using
@@ -10,8 +11,31 @@ import org.json4s.DefaultFormats
 import org.json4s.native.Serialization
 import overflowdb.traversal._
 
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 import scala.util.hashing.MurmurHash3
+
+class BagOfPropertiesForNodes extends EmbeddingGenerator[AstNode, String] {
+  override def structureToString(s: String): String         = s
+  override def extractObjects(cpg: Cpg): Traversal[AstNode] = cpg.method.internal
+  override def enumerateSubStructures(obj: AstNode): List[String] = {
+    val relevantFields = Set(PropertyNames.NAME, PropertyNames.FULL_NAME, PropertyNames.CODE)
+
+    List(obj.id().toString) ++ obj
+      .propertiesMap()
+      .entrySet()
+      .asScala
+      .toList
+      .filter { e => relevantFields.contains(e.getKey) }
+      .sortBy(_.getKey)
+      .map { e =>
+        s"${e.getKey}: ${e.getValue}"
+      } ++ List(s"label: ${obj.label}")
+  }
+
+  override def objectToString(node: AstNode): String = node.id().toString
+  override def hash(label: String): String           = label
+}
 
 class BagOfAPISymbolsForMethods extends EmbeddingGenerator[Method, AstNode] {
   override def extractObjects(cpg: Cpg): Traversal[Method]           = cpg.method
@@ -21,7 +45,7 @@ class BagOfAPISymbolsForMethods extends EmbeddingGenerator[Method, AstNode] {
 }
 
 object EmbeddingGenerator {
-  type SparseVectorWithExplicitFeature = Map[Int, (Double, String)]
+  type SparseVectorWithExplicitFeature = Map[String, (Double, String)]
   type SparseVector                    = Map[Int, Double]
 }
 
@@ -34,8 +58,8 @@ trait EmbeddingGenerator[T, S] {
   import EmbeddingGenerator._
 
   case class Embedding(data: (() => Traversal[(T, SparseVectorWithExplicitFeature)])) {
-    lazy val dimToStructure: Map[Int, String] = {
-      val m = mutable.HashMap[Int, String]()
+    lazy val dimToStructure: Map[String, String] = {
+      val m = mutable.HashMap[String, String]()
       data().foreach { case (_, vector) =>
         vector.foreach { case (hash, (_, structureAsString)) =>
           m.put(hash, structureAsString)
@@ -44,11 +68,11 @@ trait EmbeddingGenerator[T, S] {
       m.toMap
     }
 
-    lazy val structureToDim: Map[String, Int] = for ((k, v) <- dimToStructure) yield (v, k)
+    lazy val structureToDim: Map[String, String] = for ((k, v) <- dimToStructure) yield (v, k)
 
     def objects: Traversal[String] = data().map { case (obj, _) => objectToString(obj) }
 
-    def vectors: Traversal[Map[Int, Double]] = data().map { case (_, vector) =>
+    def vectors: Traversal[Map[String, Double]] = data().map { case (_, vector) =>
       vector.map { case (dim, (v, _)) => dim -> v }
     }
 
@@ -68,7 +92,7 @@ trait EmbeddingGenerator[T, S] {
 
   private def vectorize(substructures: List[S]): SparseVectorWithExplicitFeature = {
     substructures
-      .map(structureToString)
+      .map(x => structureToString(x))
       .groupBy(identity)
       .view
       .mapValues(_.size)
@@ -78,7 +102,7 @@ trait EmbeddingGenerator[T, S] {
       .toMap
   }
 
-  def hash(label: String): Int = MurmurHash3.stringHash(label)
+  def hash(label: String): String = MurmurHash3.stringHash(label).toString
 
   def structureToString(s: S): String
 
@@ -119,7 +143,7 @@ object JoernVectors extends App {
   parseConfig.foreach { config =>
     exitIfInvalid(config.outDir, config.cpgFileName)
     Using.resource(CpgBasedTool.loadFromOdb(config.cpgFileName)) { cpg =>
-      val embedding = new BagOfAPISymbolsForMethods().embed(cpg)
+      val embedding = new BagOfPropertiesForNodes().embed(cpg)
       println("{")
       println("\"objects\":")
       traversalToJson(embedding.objects)
@@ -129,6 +153,10 @@ object JoernVectors extends App {
       }
       println(",\"vectors\":")
       traversalToJson(embedding.vectors)
+      println(",\"edges\":")
+      traversalToJson(cpg.graph.edges().map { x =>
+        Map("src" -> x.outNode().id(), "dst" -> x.inNode().id(), "label" -> x.label())
+      })
       println("}")
     }
   }

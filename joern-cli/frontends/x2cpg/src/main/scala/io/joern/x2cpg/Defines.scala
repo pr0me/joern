@@ -16,4 +16,9 @@ object Defines {
   val UnresolvedNamespace = "<unresolvedNamespace>"
   val UnresolvedSignature = "<unresolvedSignature>"
 
+  // Name of the synthetic, static method that contains the initialization of member variables.
+  val StaticInitMethodName = "<clinit>"
+
+  // Name of the constructor.
+  val ConstructorMethodName = "<init>"
 }
