@@ -24,9 +24,7 @@ class Node(filename: String) {
       .getLines()
       .collect{ case regex(value) => value }
       .toList
-
-    println(includeList)
-
+    
     includeList
   }
 }
@@ -65,8 +63,11 @@ class DependencyGraph(inputPath: String, kDistance: Int) {
     this.nodes = getNodes()
     this.edges = getEdges(kDistance)
 
-    println("Edges:")
-    edges.map(e => println(e))
+    nodes.map(n => { 
+      println("<" + n.name + "> depends on:")
+      n.edges.map(e => println(e)) 
+      println("___________________")
+    })
   }
 
   def getFiles(): Array[String] = {
