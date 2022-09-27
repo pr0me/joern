@@ -20,7 +20,7 @@ class C2Cpg extends X2CpgFrontend[Config] {
 
   def createCpg(config: Config): Try[Cpg] = {
     // new DependencyGraph(config.inputPath, 2).compute()
-    new SplitMergeSplicer(config.inputPath).run()
+    new SplitMergeSplicer(config.inputPath, 2, 4).run()
     withNewEmptyCpg(config.outputPath, config) { (cpg, config) =>
       new MetaDataPass(cpg, Languages.NEWC, config.inputPath).createAndApply()
       new AstCreationPass(cpg, AstCreationPass.SourceFiles, config, report).createAndApply()

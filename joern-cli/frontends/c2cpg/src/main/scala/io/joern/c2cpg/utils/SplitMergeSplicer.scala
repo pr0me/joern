@@ -11,10 +11,16 @@ class SplitMergeSplicer(inputPath: String, kDistance: Int = 2, maxSplitSize: Int
   def run(): Unit = {
     dependencyGraph.compute()
     val partitions = initPartitions()
-    val reducedPartitions = split(partitions)
+
+    var cappedPartitions: Array[Array[Node]] = Array()
+    partitions.map(p => 
+      cappedPartitions = if (p.size > maxSplitSize) cappedPartitions ++ split(p) else cappedPartitions :+ p)
+
+    println("\ncapped partitions:")
+    println(cappedPartitions.map(p => p.map(n => n.name).mkString(", ")).mkString("\n"))
   }
 
-  // creates a partition for each node in the dependency graph
+  // create a partition for each node in the dependency graph
   def initPartitions(): Array[Array[Node]] = {
     var partitions: Array[Array[Node]] =  Array()
     dependencyGraph.nodes.map(n => {
@@ -24,18 +30,30 @@ class SplitMergeSplicer(inputPath: String, kDistance: Int = 2, maxSplitSize: Int
       partitions = partitions :+ currPartition
     })
 
-    println("\nPartitions:")
-    println(partitions.map(p => p.map(n => n.name).mkString(",")).mkString("\n"))
-    println("\n")
     partitions
   }
 
-  // splits partitions which have more than maxSplitSize elements while preserving high-connectivity 
-  def split(partitions: Array[Array[Node]]): Array[Array[Node]] = {
-    val splits: Array[Array[Node]] =  Array()
-    
-    
-    splits
+  // split partitions which have more than maxSplitSize elements while preserving high-connectivity 
+  def split(partition: Array[Node]): Array[Array[Node]] = {
+    var splits: Array[Array[Node]] =  Array()
+    val sortedByDegreeDesc = partition.sortBy(n => n.degree).reverse
+
+    // fraction of the high partition
+    var p: Int = (partition.size / 3.0).floor.toInt
+    if (p > maxSplitSize) 
+      p = (maxSplitSize / 3.0).floor.toInt
+
+    val highSplit = sortedByDegreeDesc.slice(0, p)
+    val lowSplit = sortedByDegreeDesc.slice(p, sortedByDegreeDesc.size)
+
+    // divide lowSplit uniformly
+    val nSubsets = ((partition.size - p) / (maxSplitSize - p).toFloat).floor.toInt + 1
+    val nElements = (lowSplit.size / nSubsets.toFloat).ceil.toInt
+    splits = lowSplit.sliding(nElements, nElements).toArray
+
+    // include the highSplit, containing nodes of high connectivity, in every split
+    splits = splits.map(p => p ++ highSplit) 
+    splits   
   }
   
   def merge(): Unit = {
