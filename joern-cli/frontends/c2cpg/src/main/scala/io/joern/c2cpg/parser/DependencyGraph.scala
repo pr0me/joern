@@ -10,6 +10,7 @@ class Node(filename: String) {
   val name = filename.split("/").last
   val includes = getIncludes(filename)
   var edges: scala.collection.mutable.Set[Edge] = scala.collection.mutable.Set()
+  var degree: Int = 0
   val filetype = if (filename.endsWith(".c") || filename.endsWith(".cpp"))
         "source"
       else if (filename.endsWith(".h") || filename.endsWith(".hpp"))
@@ -24,8 +25,6 @@ class Node(filename: String) {
       .getLines()
       .collect{ case regex(value) => value }
       .toList
-
-    println(includeList)
 
     includeList
   }
@@ -65,8 +64,13 @@ class DependencyGraph(inputPath: String, kDistance: Int) {
     this.nodes = getNodes()
     this.edges = getEdges(kDistance)
 
-    println("Edges:")
-    edges.map(e => println(e))
+    computeConnectivity()
+    
+    nodes.map(n => { 
+      println("\n<" + n.name + "> degree: " + n.degree.toString())
+      n.edges.map(e => println(e)) 
+      println("___________________")
+    })
   }
 
   def getFiles(): Array[String] = {
@@ -90,6 +94,7 @@ class DependencyGraph(inputPath: String, kDistance: Int) {
   // add transitive edges
   def getEdges(kDistance: Int): Set[Edge] = {
     var edges: Array[Edge] = Array()
+
     for (currNode <- this.nodes) {
       var allNextNodes = Array(currNode)
       for (_ <- 0 until kDistance) {
@@ -105,6 +110,21 @@ class DependencyGraph(inputPath: String, kDistance: Int) {
     }
     
     edges.toSet
+  }
+
+  def computeConnectivity(): Unit = {
+    val connectivity = collection.mutable.Map[String, Int]().withDefaultValue(0)
+
+    this.nodes.map(n => {
+      connectivity(n.name) += n.edges.size
+      n.edges.map(e => {
+        connectivity(e.getEnd().name) += 1 
+      })
+    }) 
+
+    this.nodes.map(n => {
+      n.degree = connectivity(n.name)
+    })
   }
 
   def findNode(name: String): Option[Node] = {
