@@ -9,28 +9,34 @@ import io.joern.c2cpg.parser.DependencyGraph
 class SplitMergeSplicer(inputPath: String, kDistance: Int = 2, maxSplitSize: Int = 500) {
   val dependencyGraph = new DependencyGraph(inputPath, kDistance)
 
-  def run(): Unit = {
+  def run(): Set[Set[Node]] = {
     dependencyGraph.compute()
-    val partitions: Set[Set[Node]] = Set()
-    initPartitions(partitions)
+    
+    val partitions = initPartitions()
 
     val cappedPartitions: Set[Set[Node]] = Set()
     partitions.map(p => 
       if (p.size > maxSplitSize) cappedPartitions ++= split(p) else cappedPartitions += p)
       
-    merge(cappedPartitions)
+    val finalPartitions = merge(cappedPartitions)
     println("\npartitions:")
-    println(cappedPartitions.map(p => p.map(n => n.name).mkString(", ")).mkString("\n"))
+    println(finalPartitions.map(p => p.map(n => n.name).mkString(", ")).mkString("\n"))
+
+    finalPartitions
   }
 
   // create a partition for each node in the dependency graph
-  def initPartitions(partitions: Set[Set[Node]]): Unit = {
+  def initPartitions(): Set[Set[Node]] = {
+    val partitions: Set[Set[Node]] = Set()
+
     dependencyGraph.nodes.map(n => {
       val currPartition: Set[Node] = Set()
       currPartition += n
       n.edges.map(e => currPartition += e.getEnd())
       partitions += currPartition
     })
+
+    partitions
   }
 
   // split partitions which have more than maxSplitSize elements while preserving high-connectivity 
@@ -59,7 +65,8 @@ class SplitMergeSplicer(inputPath: String, kDistance: Int = 2, maxSplitSize: Int
     splits
   }
   
-  def merge(partitions: Set[Set[Node]]): Unit = {
+  def merge(partitions: Set[Set[Node]]): Set[Set[Node]] = {
+    // remove redundant partitions
     partitions.map(p1 => {
       if (!partitions.forall(p2 => !(p1.subsetOf(p2) && p1 != p2))) {
         partitions -= p1
@@ -69,10 +76,24 @@ class SplitMergeSplicer(inputPath: String, kDistance: Int = 2, maxSplitSize: Int
     nextFit(partitions)
   }
 
+  // Next-Fit bin packing algorithm
   def nextFit(partitions: Set[Set[Node]]): Set[Set[Node]] = {
-    var finalPartitions: Set[Set[Node]] = Set()
+    val fittedPartitions: Set[Set[Node]] = Set()
 
-    finalPartitions
+    val sortedBySizeAsc = partitions.toArray.sortBy(p => p.size)
+    var tmpPartition: Set[Node] = Set()
+
+    sortedBySizeAsc.map(p => {
+      if (p.size + tmpPartition.size <= maxSplitSize) {
+        tmpPartition ++= p
+      } else {
+        fittedPartitions += tmpPartition
+        tmpPartition = p
+      }
+    })
+    fittedPartitions += tmpPartition
+
+    fittedPartitions
   }
 
   def populateDirectories(splits: List[List[Node]]): Unit = {
