@@ -1,6 +1,7 @@
 package io.joern.c2cpg.utils
 
 import java.io.File
+import scala.collection.mutable.Set
 import io.joern.c2cpg.parser.Node
 import io.joern.c2cpg.parser.DependencyGraph
 
@@ -10,27 +11,26 @@ class SplitMergeSplicer(inputPath: String, kDistance: Int = 2, maxSplitSize: Int
 
   def run(): Unit = {
     dependencyGraph.compute()
-    val partitions = initPartitions()
+    val partitions: Set[Set[Node]] = Set()
+    initPartitions(partitions)
 
-    var cappedPartitions: Set[Set[Node]] = Set()
+    val cappedPartitions: Set[Set[Node]] = Set()
     partitions.map(p => 
       if (p.size > maxSplitSize) cappedPartitions ++= split(p) else cappedPartitions += p)
-
-    println("\ncapped partitions:")
+      
+    merge(cappedPartitions)
+    println("\npartitions:")
     println(cappedPartitions.map(p => p.map(n => n.name).mkString(", ")).mkString("\n"))
   }
 
   // create a partition for each node in the dependency graph
-  def initPartitions(): Set[Set[Node]] = {
-    var partitions: Set[Set[Node]] =  Set()
+  def initPartitions(partitions: Set[Set[Node]]): Unit = {
     dependencyGraph.nodes.map(n => {
-      var currPartition: Set[Node] = Set()
+      val currPartition: Set[Node] = Set()
       currPartition += n
       n.edges.map(e => currPartition += e.getEnd())
       partitions += currPartition
     })
-
-    partitions
   }
 
   // split partitions which have more than maxSplitSize elements while preserving high-connectivity 
@@ -54,29 +54,19 @@ class SplitMergeSplicer(inputPath: String, kDistance: Int = 2, maxSplitSize: Int
     // include the highSplit, containing nodes of high connectivity, in every split
     splitArrays = splitArrays.map(p => p ++ highSplit)
 
-    var splits: Set[Set[Node]] = Set()
-    splitArrays.map(p => splits += p.toSet)
+    val splits: Set[Set[Node]] = Set()
+    splitArrays.map(p => splits += p.to(collection.mutable.Set))
     splits
   }
   
-  def merge(partitions: Set[Set[Node]]): Set[Set[Node]] = {
-    var mergedPartitions: Set[Set[Node]] = Set()
-
+  def merge(partitions: Set[Set[Node]]): Unit = {
     partitions.map(p1 => {
-      // var isSubset = false
-      // if (partitions.forall(p2 => !(p1 != p2 && p1.forall(p2.contains)))) {
-      // if (partitions.forall(p2 => !(p1.subsetOf(p2) && p1 != p2))) {
-      //   mergedPartitions = mergedPartitions :- p1
-      // }
-
-      // partitions.takeWhile(!(_)).map(p2 => {
-      //   if (p1.forall(p2.contains) && p1 != p2)
-      //     true
-      //   else 
-      //     false
-      // })
+      if (!partitions.forall(p2 => !(p1.subsetOf(p2) && p1 != p2))) {
+        partitions -= p1
+      }
     })
-    nextFit(mergedPartitions)
+
+    nextFit(partitions)
   }
 
   def nextFit(partitions: Set[Set[Node]]): Set[Set[Node]] = {
