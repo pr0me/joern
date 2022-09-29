@@ -1,6 +1,7 @@
 package io.joern.c2cpg.utils
 
-import java.io.File
+import java.io.{File,FileInputStream,FileOutputStream}
+import scala.language.postfixOps
 import scala.collection.mutable.Set
 import io.joern.c2cpg.parser.Node
 import io.joern.c2cpg.parser.DependencyGraph
@@ -9,7 +10,8 @@ import io.joern.c2cpg.parser.DependencyGraph
 class SplitMergeSplicer(inputPath: String, kDistance: Int = 2, maxSplitSize: Int = 500) {
   val dependencyGraph = new DependencyGraph(inputPath, kDistance)
 
-  def run(): Set[Set[Node]] = {
+  // splits a code base into multiple dependency-relative sets
+  def run(): Unit = {
     dependencyGraph.compute()
     
     val partitions = initPartitions()
@@ -22,7 +24,7 @@ class SplitMergeSplicer(inputPath: String, kDistance: Int = 2, maxSplitSize: Int
     println("\npartitions:")
     println(finalPartitions.map(p => p.map(n => n.name).mkString(", ")).mkString("\n"))
 
-    finalPartitions
+    populateDirectories(finalPartitions)
   }
 
   // create a partition for each node in the dependency graph
@@ -96,12 +98,17 @@ class SplitMergeSplicer(inputPath: String, kDistance: Int = 2, maxSplitSize: Int
     fittedPartitions
   }
 
-  def populateDirectories(splits: List[List[Node]]): Unit = {
-    val splitDirs = splits.map(split => {
+  def populateDirectories(splits: Set[Set[Node]]): Unit = {
+    splits.map(split => {
       val splitDir = new File("/tmp/" + "split_" + split.hashCode())
       splitDir.mkdir()
-      splitDir
+      split.map(node => {
+        val src = new File(node.getFilename())
+        val dest = new File(splitDir + "/" + node.name)
+        dest.createNewFile()
+        new FileOutputStream(dest).getChannel() transferFrom(
+          new FileInputStream(src) getChannel, 0, Long.MaxValue )
+      })
     })
-    
   }
 }
